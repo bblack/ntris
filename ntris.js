@@ -24,6 +24,7 @@ var SHAPES = [
 var OFFGRID = undefined;
 var EMPTY = 0;
 var FULL = 1;
+var FULL_FLASH = 2;
 
 function inherits(to, from){
     for (var k in from.prototype) {
@@ -34,8 +35,7 @@ function inherits(to, from){
 function Game(){
     this.board = new Board(10, 18);
     this.tickHandle = setInterval(this.onTick.bind(this), 1000);
-    var newShape = _.sample(SHAPES);
-    this.dropOmino(newShape);
+    this.dropRandomOmino();
     EventEmitter2.apply(this);
 }
 
@@ -64,6 +64,11 @@ Game.prototype.cement = function(board, omino){
     })
 }
 
+Game.prototype.dropRandomOmino = function(){
+    var newShape = _.sample(SHAPES);
+    this.dropOmino(newShape);
+}
+
 Game.prototype.dropOmino = function(shape){
     if (this.activeOmino) {
         throw new Error("Can only have one active shape at a time");
@@ -73,6 +78,7 @@ Game.prototype.dropOmino = function(shape){
         y: 0,
         shape: shape
     };
+    this.emit('tick');
     if (this.collides(this.board, this.activeOmino)) {
         this.end();
     }
@@ -88,6 +94,41 @@ Game.prototype.end = function(){
     console.log('Game ended.')
 }
 
+Game.prototype.resolveCompletedRows = function(callback){
+    var self = this;
+    // find completed rows
+    var completedRowNums = _.reduce(this.board.rows, function(memo, row, rownum){
+        if (_.all(row))
+            memo.push(rownum);
+        return memo;
+    }, []);
+    if (!completedRowNums.length) {
+        callback();
+    } else {
+        // flash them for a couple seconds
+        _.each(completedRowNums, function(rownum){
+            self.board.rows[rownum].forEach(function(col, colnum){
+                self.board.rows[rownum][colnum] = FULL_FLASH;
+            });
+            self.emit('tick');
+        })
+        setTimeout(function(){
+            // remove them && compact the board
+            // sort descending, so when we remove it doesn't fuck up indeces
+            completedRowNums = completedRowNums.sort(function(a,b){
+                return b-a;
+            });
+            _.each(completedRowNums, function(rownum){
+                self.board.rows.splice(rownum, 1);
+            });
+            _.each(completedRowNums, function(rownum){
+                self.board.pushNewRow();
+            });
+            callback();
+        }, 1000)
+    }
+}
+
 Game.prototype.moveX = function(cols){
     var omino = _.clone(this.activeOmino);
     if (!omino) return;
@@ -98,15 +139,17 @@ Game.prototype.moveX = function(cols){
 }
 
 Game.prototype.moveDown = function(){
+    var self = this;
     var omino = this.activeOmino;
     if (!omino) return;
     omino.y += 1;
     if (this.collides(this.board, omino)) {
         this.activeOmino.y -= 1;
-        this.cement(this.board, omino);
         delete this.activeOmino;
-        var newShape = _.sample(SHAPES);
-        this.dropOmino(newShape);
+        this.cement(this.board, omino);
+        this.resolveCompletedRows(function(){
+            self.dropRandomOmino();
+        })
     }
     this.emit('tick');
 }
@@ -135,12 +178,16 @@ function Board(w, h){
     this.height = h;
     self.rows = [];
     _.times(h, function(rowNum){
-        var row = new Array();
-        _.times(w, function(colNum){
-            row.push(EMPTY);
-        });
-        self.rows.push(row);
+        self.pushNewRow();
     });
+}
+
+Board.prototype.pushNewRow = function(){
+    var row = new Array();
+    _.times(this.width, function(colNum){
+        row.push(EMPTY);
+    });
+    this.rows.unshift(row);
 }
 
 Board.prototype.getPoint = function(row, col){
@@ -157,6 +204,15 @@ function Drawer(game, canvas){
     var BLOCKSIZE = this.BLOCKSIZE = 30;
     this.game = game;
     this.canvas = canvas;
+    this.STYLE = {
+        board: {
+            strokeStyle: 'gray',
+            fillStyle: 'silver'
+        },
+        active: {
+            fillStyle: 'white'
+        }
+    }
 
     canvas.width = BLOCKSIZE * this.game.board.width;
     canvas.height = BLOCKSIZE * this.game.board.height;
@@ -190,7 +246,7 @@ function Drawer(game, canvas){
 Drawer.prototype.drawBoard = function(canvas){
     var BLOCKSIZE = this.BLOCKSIZE;
     var ctx = canvas.getContext('2d');
-    ctx.strokeStyle = 'silver';
+    ctx.strokeStyle = this.STYLE.board.strokeStyle;
     _.each(game.board.rows, function(row, rowNum){
         _.each(row, function(col, colNum){
             var x = BLOCKSIZE * colNum
@@ -204,8 +260,9 @@ Drawer.prototype.drawActive = function(canvas){
     var BLOCKSIZE = this.BLOCKSIZE;
     var ctx = canvas.getContext('2d');
     var omino = this.game.activeOmino;
-    ctx.strokeStyle = 'darkgray';
+    ctx.fillStyle = this.STYLE.active.fillStyle;
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (!omino) return;
     _.each(omino.shape, function(row, rownum){
         var y = BLOCKSIZE * (rownum + omino.y);
         _.each(row, function(val, colnum){
@@ -219,16 +276,22 @@ Drawer.prototype.drawActive = function(canvas){
 Drawer.prototype.drawStatic = function(canvas){
     var BLOCKSIZE = this.BLOCKSIZE;
     var ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'gray';
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (var row=0; row < this.game.board.rows.length; row++){
         for (var col=0; col < this.game.board.rows[row].length; col++){
             var point = this.game.board.getPoint(row, col);
-            if (point === FULL) {
+            if (point) {
                 var x = BLOCKSIZE * col;
                 var y = BLOCKSIZE * row;
+                if (point === FULL) {
+                    ctx.fillStyle = this.STYLE.board.fillStyle;
+                } else if (point === FULL_FLASH) {
+                    ctx.fillStyle = 'chartreuse';
+                }
                 ctx.fillRect(x, y, BLOCKSIZE, BLOCKSIZE);
             }
+
         }
     }
 
