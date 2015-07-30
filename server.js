@@ -5,6 +5,11 @@ var socketio = require('socket.io');
 var ntris = require('./ntris');
 
 var app = http.createServer(function(req, res){
+    if (req.url === '/favicon.ico') {
+        res.writeHead(200);
+        res.end();
+        return;
+    }
     var filepath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
     fs.readFile(filepath, function(err, data){
         if (err) {
