@@ -85,7 +85,8 @@ Game.prototype.getState = function(){
         board: {
             rows: this.board.rows
         },
-        activeOmino: this.activeOmino
+        activeOmino: this.activeOmino,
+        ended: this.ended
     };
 }
 
@@ -93,6 +94,7 @@ Game.prototype.getState = function(){
 Game.prototype.setState = function(state){
     this.board.rows = state.board.rows;
     this.activeOmino = state.activeOmino;
+    this.ended = state.ended;
     this.emit('tick'); // drawer draws on this event
 }
 
@@ -146,7 +148,8 @@ Game.prototype.isRunning = function(){
 Game.prototype.end = function(){
     clearInterval(this.tickHandle);
     delete this.tickHandle;
-    console.log('Game ended.')
+    this.emit('end');
+    this.ended = true;
 }
 
 Game.prototype.resolveCompletedRows = function(callback){

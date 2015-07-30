@@ -40,6 +40,9 @@ io.on('connection', function(socket){
     game.run()
     .on('state', function(state){
         io.emit('state', {id: gameId, state: state});
+    })
+    .on('end', function(){
+        io.emit('end', {id: gameId});
     });
 
     var world = games.map(function(game, id){

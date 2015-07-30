@@ -36,6 +36,9 @@ define(function(require){
     })
     .on('state', function(args){
       games[args.id].setState(args.state);
+    })
+    .on('end', function(args){
+      games[args.id].end();
     });
 
     Mousetrap.bind('right', function(){

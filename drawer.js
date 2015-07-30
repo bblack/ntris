@@ -42,6 +42,10 @@ define(function(require){
             ctx.drawImage(staticBuf, 0, 0);
             self.drawActive(activeBuf);
             ctx.drawImage(activeBuf, 0, 0);
+            if (game.ended) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
         draw();
         game.on('tick', draw);
