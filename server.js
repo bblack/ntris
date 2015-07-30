@@ -24,6 +24,7 @@ var io = socketio(app);
 app.listen(process.env.PORT || 7777);
 console.log('Listening on', app.address());
 var clients = [];
+var games = [];
 
 io.on('connection', function(socket){
     socket.on('error', function(e){
@@ -32,18 +33,19 @@ io.on('connection', function(socket){
     })
     console.log('client connected');
     clients.push(socket);
-    if (clients.length == 1) {
-        var game = new ntris.Game(socket);
-        game.run();
-        // TODO: listen for any event on an 'updates' channel
-        io.emit('foo', 'bar');
-        game.on('state', function(state){
-            io.emit('state', state); // to everyone
-        });
-        socket.emit('msg', 'You are now playing!');
-        console.log('player playing')
-    } else {
-        socket.emit('msg', 'You are watching another game already in progress.');
-        console.log('player watching')
-    }
+
+    var game = new ntris.Game(socket);
+    var gameId = games.push(game) - 1;
+    socket.broadcast.emit('newgame', {id: gameId, state: game.getState()});
+    game.run()
+    .on('state', function(state){
+        io.emit('state', {id: gameId, state: state});
+    });
+
+    var world = games.map(function(game, id){
+        return {id: id, state: game.getState()};
+    });
+    socket.emit('world', world);
+    socket.emit('msg', 'You are now playing!');
+    console.log('player playing');
 })

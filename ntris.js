@@ -50,6 +50,7 @@ util.inherits(Game, events.EventEmitter);
 Game.prototype.run = function(){
     this.tickHandle = setInterval(this.onTick.bind(this), 1000);
     this.dropRandomOmino();
+    return this;
 }
 
 Game.prototype.obeyCommandsFrom = function(cmds){
@@ -75,12 +76,17 @@ Game.prototype.obeyCommandsFrom = function(cmds){
 // emits the entire game state.
 // TODO: emit smaller deltas and more compact representations
 Game.prototype.emitEntireState = function(){
-    this.emit('state', {
+    var state = this.getState();
+    this.emit('state', state);
+}
+
+Game.prototype.getState = function(){
+    return {
         board: {
             rows: this.board.rows
         },
         activeOmino: this.activeOmino
-    });
+    };
 }
 
 // for a client, having received state update, to set local state

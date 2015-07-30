@@ -12,14 +12,30 @@ requirejs.config({
 define(function(require){
   var io = require('io')
   var Mousetrap = require('mousetrap');
-  var ntris;
   require(['util', 'drawer'], function(util, Drawer){
     var ntris = require('ntris');
-    var game = new ntris.Game();
-    var drawer = new Drawer(game, document.getElementsByTagName('canvas')[0]);
+    var games = [];
+
+    function addGame(args){
+      var game = new ntris.Game();
+      games[args.id] = game;
+      var canvas = document.createElement('canvas');
+      document.body.appendChild(canvas);
+      var drawer = new Drawer(game, canvas)
+      game.setState(args.state);
+    }
+
     var socket = io('http://localhost:7777')
-    .on('state', function(state){
-      game.setState(state);
+    .once('world', function(gameStates){
+      gameStates.forEach(function(gameState){
+        addGame(gameState);
+      });
+    })
+    .on('newgame', function(args){
+      addGame(args);
+    })
+    .on('state', function(args){
+      games[args.id].setState(args.state);
     });
 
     Mousetrap.bind('right', function(){
