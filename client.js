@@ -25,7 +25,7 @@ define(function(require){
       game.setState(args.state);
     }
 
-    var socket = io('http://localhost:7777')
+    var socket = io(window.location.origin)
     .once('world', function(gameStates){
       gameStates.forEach(function(gameState){
         addGame(gameState);

@@ -38,6 +38,18 @@ io.on('connection', function(socket){
     var gameId = games.push(game) - 1;
     socket.broadcast.emit('newgame', {id: gameId, state: game.getState()});
     game.run()
+    .on('rowcleared', function(){
+        var l = (gameId - 1 + games.length) % games.length;
+        var r = (gameId + 1) % games.length;
+        var neighbors = [games[l], games[r]];
+        if (neighbors[0] === neighbors[1]) {
+            neighbors.pop();
+        }
+        var blocksPerNeighbor = game.board.width / 2;
+        neighbors.forEach(function(neighborGame){
+            neighborGame.enqueuePartialRow(blocksPerNeighbor);
+        });
+    })
     .on('state', function(state){
         io.emit('state', {id: gameId, state: state});
     })

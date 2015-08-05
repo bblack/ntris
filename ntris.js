@@ -43,6 +43,7 @@ function Game(cmdEmitter){
     }
 
     this.board = new Board(10, 18);
+    this.beforeTickFns = [];
     events.EventEmitter.apply(this);
 }
 util.inherits(Game, events.EventEmitter);
@@ -108,7 +109,15 @@ Game.prototype.collides = function(board, omino){
     })
 }
 
+Game.prototype.beforeTick = function(fn){
+    this.beforeTickFns.push(fn);
+}
+
 Game.prototype.onTick = function(){
+    while (this.beforeTickFns.length) {
+        this.beforeTickFns[0]();
+        this.beforeTickFns.pop();
+    }
     this.moveDown();
 }
 
@@ -177,7 +186,10 @@ Game.prototype.resolveCompletedRows = function(callback){
                 return b-a;
             });
             _.each(completedRowNums, function(rownum){
+                // if another row has been pushed since setTimeout was called,
+                // this row number will be wrong! use the row, not the index
                 self.board.rows.splice(rownum, 1);
+                self.emit('rowcleared');
             });
             _.each(completedRowNums, function(rownum){
                 self.board.pushNewRow();
@@ -230,6 +242,14 @@ Game.prototype.rotate = function(){
     this.emitEntireState();
 }
 
+Game.prototype.enqueuePartialRow = function(blocks){
+    var self = this;
+    this.beforeTick(function(){
+        var row = self.board.createPartialRow(blocks);
+        self.board.pushRowBottom(row);
+    });
+}
+
 function Board(w, h){
     var self = this;
     this.width = w;
@@ -246,6 +266,22 @@ Board.prototype.pushNewRow = function(){
         row.push(EMPTY);
     });
     this.rows.unshift(row);
+}
+
+Board.prototype.createPartialRow = function(blocks){
+    console.log(blocks)
+    var row = new Array(this.width);
+    for (var i=0; i<row.length; i++) {
+        row[i] = (i < blocks) ? FULL : EMPTY;
+    }
+    row = _.shuffle(row);
+    console.log(row);
+    return row;
+}
+
+Board.prototype.pushRowBottom = function(row){
+    this.rows.push(row);
+    this.rows.shift();
 }
 
 Board.prototype.getPoint = function(row, col){
