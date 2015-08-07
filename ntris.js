@@ -164,36 +164,28 @@ Game.prototype.end = function(){
 Game.prototype.resolveCompletedRows = function(callback){
     var self = this;
     // find completed rows
-    var completedRowNums = _.reduce(this.board.rows, function(memo, row, rownum){
-        if (_.all(row))
-            memo.push(rownum);
-        return memo;
-    }, []);
-    if (!completedRowNums.length) {
+    var completedRows = _.filter(this.board.rows, function(row){
+        return _.all(row);
+    });
+    if (!completedRows.length) {
         callback();
     } else {
         // flash them for a couple seconds
-        _.each(completedRowNums, function(rownum){
-            self.board.rows[rownum].forEach(function(col, colnum){
-                self.board.rows[rownum][colnum] = FULL_FLASH;
+        _.each(completedRows, function(row){
+            row.forEach(function(col, colnum){
+                row[colnum] = FULL_FLASH;
             });
             self.emitEntireState();
         })
         setTimeout(function(){
-            // remove them && compact the board
-            // sort descending, so when we remove it doesn't fuck up indeces
-            completedRowNums = completedRowNums.sort(function(a,b){
-                return b-a;
-            });
-            _.each(completedRowNums, function(rownum){
-                // if another row has been pushed since setTimeout was called,
-                // this row number will be wrong! use the row, not the index
-                self.board.rows.splice(rownum, 1);
+            // remove them, compact the board, and push empty rows
+            self.board.rows = _.difference(self.board.rows, completedRows);
+            _.each(completedRows, function(){
                 self.emit('rowcleared');
             });
-            _.each(completedRowNums, function(rownum){
+            while (self.board.rows.length < self.board.height) {
                 self.board.pushNewRow();
-            });
+            }
             callback();
         }, 1000)
     }
